@@ -56,7 +56,11 @@ export function mergeJsonFiles(files: ParsedFile[]): MergeResult {
 
     // Initialize visual_blocks if missing
     if (!merged.visual_blocks) {
-        merged.visual_blocks = {};
+        merged.visual_blocks = {
+            characters: [],
+            locations: [],
+            props: []
+        };
     }
     if (!merged.visual_blocks.characters) merged.visual_blocks.characters = [];
     if (!merged.visual_blocks.locations) merged.visual_blocks.locations = [];
