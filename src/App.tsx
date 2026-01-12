@@ -26,6 +26,9 @@ function App() {
   const [mergeWarnings, setMergeWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [history, setHistory] = useState<Stage1JSON[]>([]);
+  const [initialJson, setInitialJson] = useState<Stage1JSON | null>(null);
+
   const handleJsonLoad = useCallback((input: string | ParsedFile[]) => {
     if (Array.isArray(input)) {
       // Handle array of parsed files (Merge scenario)
@@ -33,18 +36,21 @@ function App() {
 
       if (mergeResult.success && mergeResult.mergedJson) {
         setMergeWarnings(mergeResult.warnings);
-        setParsedJson(mergeResult.mergedJson);
+        const newJson = mergeResult.mergedJson;
+        setParsedJson(newJson);
+        setInitialJson(JSON.parse(JSON.stringify(newJson))); // Set initial state
+        setHistory([]); // Reset history
 
         // Format the merged JSON back to string for editor/download
-        const mergedJsonStr = formatJson(JSON.stringify(mergeResult.mergedJson));
+        const mergedJsonStr = formatJson(JSON.stringify(newJson));
         setJsonInput(mergedJsonStr);
 
         // Validate the merged JSON
         const result = parseJson(mergedJsonStr);
 
         // Apply Semantic Validation if basic parse is valid
-        if (result.isValid && mergeResult.mergedJson) {
-          const semanticErrors = validateStage1Json(mergeResult.mergedJson);
+        if (result.isValid && newJson) {
+          const semanticErrors = validateStage1Json(newJson);
           result.errors.push(...semanticErrors);
         }
 
@@ -74,13 +80,15 @@ function App() {
       if (result.isValid) {
         try {
           const jsonToUse = result.fixedJson || input;
-          const parsed = JSON.parse(jsonToUse) as Stage1JSON;
+          const parsed = JSON.parse(jsonToUse) as Stage1JSON; // Removed variable assignment that was causing duplication in my head, just using parsed
 
           // Apply Semantic Validation
           const semanticErrors = validateStage1Json(parsed);
           result.errors.push(...semanticErrors);
 
           setParsedJson(parsed);
+          setInitialJson(JSON.parse(JSON.stringify(parsed))); // Set initial state
+          setHistory([]); // Reset history
           setValidationResult(result);
           setCurrentView('metadata');
           setShowEditor(false);
@@ -92,15 +100,67 @@ function App() {
         } catch {
           setShowEditor(true);
           setParsedJson(null);
+          setInitialJson(null);
+          setHistory([]);
           setValidationResult(result);
         }
       } else {
         setValidationResult(result);
         setShowEditor(true);
         setParsedJson(null);
+        setInitialJson(null);
+        setHistory([]);
       }
     }
   }, []);
+
+  const handleSceneUpdate = useCallback((sceneId: string, newText: string) => {
+    if (!parsedJson) return;
+
+    // Save to history
+    setHistory(prev => [...prev.slice(-19), JSON.parse(JSON.stringify(parsedJson))]); // Keep max 20
+
+    // Update state
+    const newJson = JSON.parse(JSON.stringify(parsedJson)) as Stage1JSON;
+    const scene = newJson.current_work.scenario.scenes.find(s => s.scene_id === sceneId);
+    if (scene) {
+      scene.scenario_text = newText;
+      setParsedJson(newJson);
+      setJsonInput(formatJson(JSON.stringify(newJson)));
+    }
+  }, [parsedJson]);
+
+  const handleUndo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.length === 0) return prev;
+      const newHistory = [...prev];
+      const previousState = newHistory.pop();
+      if (previousState) {
+        setParsedJson(previousState);
+        setJsonInput(formatJson(JSON.stringify(previousState)));
+      }
+      return newHistory;
+    });
+  }, []);
+
+  const handleRevertScene = useCallback((sceneId: string) => {
+    if (!parsedJson || !initialJson) return;
+
+    const initialScene = initialJson.current_work.scenario.scenes.find(s => s.scene_id === sceneId);
+    if (!initialScene) return;
+
+    // Save to history
+    setHistory(prev => [...prev.slice(-19), JSON.parse(JSON.stringify(parsedJson))]);
+
+    // Update state
+    const newJson = JSON.parse(JSON.stringify(parsedJson)) as Stage1JSON;
+    const scene = newJson.current_work.scenario.scenes.find(s => s.scene_id === sceneId);
+    if (scene) {
+      scene.scenario_text = initialScene.scenario_text;
+      setParsedJson(newJson);
+      setJsonInput(formatJson(JSON.stringify(newJson)));
+    }
+  }, [parsedJson, initialJson]);
 
   const handleJsonUpdate = useCallback((updatedJson: string) => {
     setJsonInput(updatedJson);
@@ -113,6 +173,8 @@ function App() {
   const handleReset = useCallback(() => {
     setJsonInput('');
     setParsedJson(null);
+    setInitialJson(null);
+    setHistory([]);
     setValidationResult(null);
     setMergeWarnings([]);
     setCurrentView('empty');
@@ -251,7 +313,14 @@ function App() {
           );
         case 'scenario':
           return parsedJson.current_work.scenario ? (
-            <ScenarioView data={parsedJson} />
+            <ScenarioView
+              data={parsedJson}
+              onSceneUpdate={handleSceneUpdate}
+              onSceneRevert={handleRevertScene}
+              onUndo={handleUndo}
+              canUndo={history.length > 0}
+              initialScenario={initialJson?.current_work.scenario}
+            />
           ) : (
             <NotAvailable section="Scenario" />
           );

@@ -161,16 +161,31 @@ export function JsonEditor({ jsonInput, errors, onJsonUpdate, onValidate }: Json
           </div>
 
           {/* Re-validate Button */}
-          <button
-            onClick={handleApply}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-lg
-              bg-gradient-to-r from-accent-purple to-accent-purple-dark text-white
-              shadow-lg shadow-accent-purple/25 hover:shadow-accent-purple/40 hover:scale-[1.02]
-              transition-all duration-200 font-medium text-sm"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>다시 검증</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(editedJson);
+                showMessage('전체 코드가 복사되었습니다.', 'success');
+              }}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-lg
+                bg-bg-secondary border border-border-color text-text-secondary
+                 hover:border-accent-purple hover:text-white
+                transition-all duration-200 font-medium text-sm"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>코드 복사</span>
+            </button>
+            <button
+              onClick={handleApply}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-lg
+                bg-gradient-to-r from-accent-purple to-accent-purple-dark text-white
+                shadow-lg shadow-accent-purple/25 hover:shadow-accent-purple/40 hover:scale-[1.02]
+                transition-all duration-200 font-medium text-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>다시 검증</span>
+            </button>
+          </div>
         </div>
 
         {/* Editor Area with Line Numbers - Fixed Syntax here */}
