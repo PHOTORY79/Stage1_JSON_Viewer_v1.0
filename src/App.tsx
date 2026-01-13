@@ -17,12 +17,15 @@ import { mergeJsonFiles, ParsedFile } from './utils/jsonMerger';
 import { AlertTriangle } from 'lucide-react';
 import { validateStage1Json } from './utils/jsonValidator';
 
+import { JsonAppendModal } from './components/JsonInput/JsonAppendModal';
+
 function App() {
   const [jsonInput, setJsonInput] = useState<string>('');
   const [parsedJson, setParsedJson] = useState<Stage1JSON | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [currentView, setCurrentView] = useState<AppView>('empty');
   const [showEditor, setShowEditor] = useState(false);
+  const [showAppendModal, setShowAppendModal] = useState(false);
   const [mergeWarnings, setMergeWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -354,6 +357,59 @@ function App() {
   const hasErrors = validationResult?.errors.some(e => e.severity === 'error') || false;
   const errorCount = validationResult?.errors.filter(e => e.severity === 'error').length || 0;
 
+  const handleAppend = useCallback((newFiles: ParsedFile[]) => {
+    if (!parsedJson) return;
+
+    // 1. Convert current parsedJson to ParsedFile
+    // We treat the current project as the "Main" file for the merge context
+    const currentFile: ParsedFile = {
+      id: 'current-project',
+      name: 'Current Project',
+      content: jsonInput, // Using jsonInput string to ensure consistency
+      parsed: parsedJson,
+      type: 'main',
+      filmId: parsedJson.film_id || 'UNKNOWN'
+    };
+
+    // 2. Prepare file list for merger: [Current, ...New]
+    const filesToMerge = [currentFile, ...newFiles];
+
+    // 3. Perform Merge
+    const mergeResult = mergeJsonFiles(filesToMerge);
+
+    if (mergeResult.success && mergeResult.mergedJson) {
+      // 4. Update State
+      const newJson = mergeResult.mergedJson;
+      setParsedJson(newJson);
+
+      // Update string representation
+      const mergedJsonStr = formatJson(JSON.stringify(newJson));
+      setJsonInput(mergedJsonStr);
+
+      // Validate
+      const result = parseJson(mergedJsonStr);
+      if (result.isValid && newJson) {
+        const semanticErrors = validateStage1Json(newJson);
+        result.errors.push(...semanticErrors);
+      }
+      setValidationResult(result);
+
+      // Show warnings if any
+      if (mergeResult.warnings.length > 0) {
+        setMergeWarnings(mergeResult.warnings);
+        alert(`추가 완료 (경고 ${mergeResult.warnings.length}건)\n` + mergeResult.warnings.slice(0, 5).join('\n'));
+      } else {
+        setMergeWarnings([]);
+        alert('파일이 성공적으로 추가되었습니다.');
+      }
+
+    } else {
+      alert(`병합 실패:\n${mergeResult.errors.join('\n')}`);
+    }
+
+    setShowAppendModal(false);
+  }, [parsedJson, jsonInput]);
+
   return (
     <div className="h-screen flex flex-col bg-bg-primary">
       {/* Hidden file input */}
@@ -366,6 +422,12 @@ function App() {
         multiple // Allow multiple file selection
       />
 
+      <JsonAppendModal
+        isOpen={showAppendModal}
+        onClose={() => setShowAppendModal(false)}
+        onAppend={handleAppend}
+      />
+
       {/* Header */}
       <Header
         hasJson={!!jsonInput}
@@ -373,6 +435,7 @@ function App() {
         onUpload={handleUpload}
         onReset={handleReset}
         onDownload={handleDownload}
+        onAppend={() => setShowAppendModal(true)}
       />
 
       {/* Main Content */}

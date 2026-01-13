@@ -6,9 +6,10 @@ interface HeaderProps {
   onUpload: () => void;
   onReset: () => void;
   onDownload: () => void;
+  onAppend: () => void;
 }
 
-export function Header({ hasJson, hasValidJson, onUpload, onReset, onDownload }: HeaderProps) {
+export function Header({ hasJson, hasValidJson, onUpload, onReset, onDownload, onAppend }: HeaderProps) {
   return (
     <header className="h-16 bg-bg-secondary border-b border-border-color flex items-center justify-between px-6">
       {/* Logo */}
@@ -39,14 +40,27 @@ export function Header({ hasJson, hasValidJson, onUpload, onReset, onDownload }:
           onClick={onReset}
           disabled={!hasJson}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200
-            ${hasJson 
-              ? 'border-border-color text-text-secondary hover:text-white hover:border-accent-red hover:bg-accent-red/5' 
+            ${hasJson
+              ? 'border-border-color text-text-secondary hover:text-white hover:border-accent-red hover:bg-accent-red/5'
               : 'border-border-color/30 text-text-secondary/30 cursor-not-allowed'
             }`}
           title="모든 입력 초기화"
         >
           <RotateCcw className="w-4 h-4" />
           <span className="text-sm font-medium">Reset</span>
+        </button>
+
+        <button
+          onClick={onAppend}
+          disabled={!hasValidJson} // Only enable append if we have a valid base project
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200
+            ${hasValidJson
+              ? 'border-border-color text-text-secondary hover:text-white hover:border-accent-purple hover:bg-accent-purple/5'
+              : 'border-border-color/30 text-text-secondary/30 cursor-not-allowed'
+            }`}
+          title="현재 프로젝트에 파일 추가"
+        >
+          <span className="text-sm font-medium">JSON 추가 (+)</span>
         </button>
 
         <button
@@ -62,6 +76,6 @@ export function Header({ hasJson, hasValidJson, onUpload, onReset, onDownload }:
           <span className="text-sm">Save JSON</span>
         </button>
       </div>
-    </header>
+    </header >
   );
 }
