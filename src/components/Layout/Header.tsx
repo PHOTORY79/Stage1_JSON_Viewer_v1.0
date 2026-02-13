@@ -19,8 +19,8 @@ export function Header({ hasJson, hasValidJson, onUpload, onReset, onDownload, o
           <Film className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">AIFI Stage 1 Viewer</h1>
-          <p className="text-xs text-text-secondary">AI Film Framework 5.0</p>
+          <h1 className="text-lg font-bold text-white tracking-tight">AIFI 시나리오 에디터</h1>
+          <p className="text-xs text-text-secondary">AI Film Framework 6.0</p>
         </div>
       </div>
 

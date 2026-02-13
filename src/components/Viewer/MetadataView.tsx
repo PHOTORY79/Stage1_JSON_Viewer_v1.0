@@ -23,11 +23,7 @@ export function MetadataView({ data }: MetadataViewProps) {
   };
 
   const stepConfig: Record<string, { label: string; color: string; progress: number }> = {
-    'logline_synopsis_development': { label: 'Step 1: 로그라인/시놉시스', color: 'bg-blue-500', progress: 25 },
-    'treatment_expansion': { label: 'Step 2: 트리트먼트', color: 'bg-orange-500', progress: 50 },
-    scenario_development: { label: '시나리오 작성', color: 'bg-blue-500', progress: 50 },
-    asset_addition: { label: '에셋 추가', color: 'bg-purple-500', progress: 100 },
-    concept_art_blocks_completed: { label: '블록 완성', color: 'bg-purple-500', progress: 100 },
+    scenario_development: { label: '시나리오 작성', color: 'bg-blue-500', progress: 100 },
   };
 
   const currentStepConfig = stepConfig[current_step] || { label: current_step, color: 'bg-gray-500', progress: 0 };

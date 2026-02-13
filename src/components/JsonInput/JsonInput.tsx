@@ -37,10 +37,8 @@ export function JsonInput({ onJsonLoad }: JsonInputProps) {
       const parsed = JSON.parse(jsonContent) as Stage1JSON;
       // Basic type detection
       let type: 'main' | 'asset' | 'unknown' = 'unknown';
-      if (parsed.current_step === 'scenario_development' || (parsed.current_work as any)?.scenario) {
+      if (parsed.current_step === 'scenario_development' || (parsed as any).scenario) {
         type = 'main';
-      } else if (parsed.current_step === 'asset_addition' || Object.keys(parsed.visual_blocks || {}).length > 0) {
-        type = 'asset';
       }
 
       return {

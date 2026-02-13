@@ -1,67 +1,33 @@
 import {
   FileText,
-  BookOpen,
-  ScrollText,
   Clapperboard,
-  Users,
-  MapPin,
-  Box,
+  Palette,
   AlertCircle,
   CheckCircle,
-  Lock
 } from 'lucide-react';
-import { AppView, Stage1JSON, CurrentStep } from '../../types/stage1.types';
+import { AppView, Stage1JSON } from '../../types/stage1.types';
 
 interface NavItem {
   id: AppView;
   label: string;
   icon: React.ReactNode;
-  availableFrom: string[]; // Changed to string[] to allow flexibility or specific union
 }
 
-// Update these to match CurrentStep type exactly + add all subsequent steps
 const navItems: NavItem[] = [
   {
     id: 'metadata',
     label: 'Metadata',
     icon: <FileText className="w-4 h-4" />,
-    availableFrom: ['synopsis_planning', 'scenario_development', 'asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
   },
   {
-    id: 'synopsis',
-    label: 'Synopsis',
-    icon: <BookOpen className="w-4 h-4" />,
-    availableFrom: ['synopsis_planning', 'scenario_development', 'asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
-  },
-  {
-    id: 'treatment',
-    label: 'Treatment',
-    icon: <ScrollText className="w-4 h-4" />,
-    availableFrom: ['synopsis_planning', 'scenario_development', 'asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
+    id: 'concept_art',
+    label: 'Concept Art List',
+    icon: <Palette className="w-4 h-4" />,
   },
   {
     id: 'scenario',
     label: 'Scenario',
     icon: <Clapperboard className="w-4 h-4" />,
-    availableFrom: ['scenario_development', 'asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
-  },
-  {
-    id: 'characters',
-    label: 'Characters',
-    icon: <Users className="w-4 h-4" />,
-    availableFrom: ['asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
-  },
-  {
-    id: 'locations',
-    label: 'Locations',
-    icon: <MapPin className="w-4 h-4" />,
-    availableFrom: ['asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
-  },
-  {
-    id: 'props',
-    label: 'Props',
-    icon: <Box className="w-4 h-4" />,
-    availableFrom: ['asset_addition', 'concept_art_blocks_completed', 'concept_art_generation']
   },
 ];
 
@@ -76,29 +42,14 @@ interface SidebarProps {
 export function Sidebar({ currentView, data, hasErrors, errorCount, onViewChange }: SidebarProps) {
   const isAvailable = (item: NavItem): boolean => {
     if (!data) return false;
-    const currentStep = data.current_step;
 
-    // 1. Step check: checks if currentStep is in the list
-    if (!item.availableFrom.includes(currentStep)) return false;
-
-    // 2. Data existence check
     switch (item.id) {
       case 'metadata':
         return true;
-      case 'synopsis':
-        return !!(data.current_work?.logline || data.current_work?.synopsis);
-      case 'treatment':
-        // Treatment might be empty in synopsis_planning, but if data exists, show it.
-        // It's possible to have partial data.
-        return !!(data.current_work?.treatment?.sequences?.length || data.current_work?.treatment?.treatment_title);
+      case 'concept_art':
+        return !!(data.concept_art_list);
       case 'scenario':
-        return !!(data.current_work?.scenario?.scenes?.length);
-      case 'characters':
-        return !!(data.visual_blocks?.characters?.length);
-      case 'locations':
-        return !!(data.visual_blocks?.locations?.length);
-      case 'props':
-        return !!(data.visual_blocks?.props?.length);
+        return !!(data.scenario?.scenes?.length);
       default:
         return true;
     }
@@ -139,7 +90,7 @@ export function Sidebar({ currentView, data, hasErrors, errorCount, onViewChange
                 )}
 
                 <span className={`transition-colors ${isActive ? 'text-accent-purple' : ''}`}>
-                  {available ? item.icon : <Lock className="w-4 h-4" />}
+                  {item.icon}
                 </span>
                 <span className="text-sm font-medium">{item.label}</span>
               </button>

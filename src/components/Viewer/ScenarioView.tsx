@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Clapperboard, Copy, Check, ChevronDown, ChevronUp, Send, Columns, Save, RotateCcw, Undo2 } from 'lucide-react';
 import { Stage1JSON, Scene, Scenario } from '../../types/stage1.types';
 
@@ -19,7 +19,7 @@ export function ScenarioView({
   canUndo,
   initialScenario
 }: ScenarioViewProps) {
-  const { scenario } = data.current_work;
+  const { scenario } = data;
   const [expandedScene, setExpandedScene] = useState<string | null>(
     scenario.scenes[0]?.scene_id || null
   );
@@ -27,17 +27,12 @@ export function ScenarioView({
   const [modificationRequests, setModificationRequests] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Sync editedTexts with scenario on load, but only if empty (optional, preserving user draft preferred)
-  // Actually, we should probably NOT auto-fill this to allow "empty means no change"
-  // But for direct editing, pre-filling is better user experience? 
-  // User wants "Apply", so they type in right panel. 
-
   const toggleScene = (sceneId: string) => {
     setExpandedScene(expandedScene === sceneId ? null : sceneId);
   };
 
   const copyScenario = async (scene: Scene) => {
-    await navigator.clipboard.writeText(scene.scenario_text);
+    await navigator.clipboard.writeText(scene.scene_scenario);
     setCopiedId(`copy-${scene.scene_id}`);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -46,8 +41,6 @@ export function ScenarioView({
     const text = editedTexts[sceneId];
     if (text && onSceneUpdate) {
       onSceneUpdate(sceneId, text);
-      // Optional: Clear edited text or keep it? 
-      // Keep it so user can continue editing.
       setCopiedId(`apply-${sceneId}`);
       setTimeout(() => setCopiedId(null), 2000);
     }
@@ -57,7 +50,6 @@ export function ScenarioView({
     if (onSceneRevert) {
       if (confirm('정말로 이 씬을 초기 상태로 되돌리시겠습니까?')) {
         onSceneRevert(sceneId);
-        // Also clear local edit draft
         setEditedTexts(prev => {
           const next = { ...prev };
           delete next[sceneId];
@@ -75,20 +67,20 @@ export function ScenarioView({
 
 ■ 대상
 - Scene: ${scene.scene_id} (Scene ${scene.scene_number})
-- Sequence: ${scene.sequence_id}
+- Heading: ${scene.scene_heading}
 
 ■ 수정 요청사항
 ${modRequest || '(수정 요청사항을 입력해주세요)'}
 
 ■ 원본 시나리오
-${scene.scenario_text}
+${scene.scene_scenario}
 
 ${editedText ? `■ 참고: 사용자 수정안
 ${editedText}` : ''}
 
 ■ 요청
 위 수정 요청을 반영하여 시나리오를 다시 작성해주세요.
-JSON의 해당 scene의 scenario_text 필드만 업데이트하여 출력해주세요.`;
+JSON의 해당 scene의 scene_scenario 필드만 업데이트하여 출력해주세요.`;
   };
 
   const copyPrompt = async (scene: Scene) => {
@@ -137,7 +129,7 @@ JSON의 해당 scene의 scenario_text 필드만 업데이트하여 출력해주�
         {scenario.scenes.map((scene) => {
           const isExpanded = expandedScene === scene.scene_id;
           const initialScene = initialScenario?.scenes.find(s => s.scene_id === scene.scene_id);
-          const isModified = initialScene && initialScene.scenario_text !== scene.scenario_text;
+          const isModified = initialScene && initialScene.scene_scenario !== scene.scene_scenario;
 
           return (
             <div
@@ -168,7 +160,7 @@ JSON의 해당 scene의 scenario_text 필드만 업데이트하여 출력해주�
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-text-secondary">{scene.sequence_id}</div>
+                    <div className="text-sm text-text-secondary">{scene.scene_heading}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -228,7 +220,7 @@ JSON의 해당 scene의 scenario_text 필드만 업데이트하여 출력해주�
                       </div>
                       <div className="bg-bg-primary rounded-xl p-5 min-h-[300px] max-h-[500px] overflow-y-auto border border-border-color">
                         <pre className="text-sm text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
-                          {scene.scenario_text}
+                          {scene.scene_scenario}
                         </pre>
                       </div>
                     </div>

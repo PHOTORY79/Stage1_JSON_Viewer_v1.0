@@ -1,4 +1,4 @@
-import { Stage1JSON, Character, Location, Prop } from '../types/stage1.types';
+import { Stage1JSON } from '../types/stage1.types';
 
 export interface ParsedFile {
     id: string;
@@ -38,92 +38,82 @@ export function mergeJsonFiles(files: ParsedFile[]): MergeResult {
     }
 
     // 2. Identify Main File
-    // Priority: 'scenario_development' step or has 'current_work.scenario' > first file
-    let mainFile = files.find(f => f.parsed.current_step === 'scenario_development' || (f.parsed.current_work && f.parsed.current_work.scenario));
+    let mainFile = files.find(f => f.parsed.current_step === 'scenario_development' || f.parsed.scenario);
 
-    // If no explicit main file found, use the first one but warn if it looks like an asset file
     if (!mainFile) {
         mainFile = files[0];
-        if (mainFile.parsed.current_step === 'asset_addition') {
-            // It's possible we are merging multiple asset files into one base asset file? 
-            // Or user just provided asset files without a scenario file. 
-            // We'll accept it but maybe the base structure comes from this file.
-        }
     }
 
     // Deep clone the main file to start merging
     const merged: Stage1JSON = JSON.parse(JSON.stringify(mainFile.parsed));
 
-    // Initialize visual_blocks if missing
-    if (!merged.visual_blocks) {
-        merged.visual_blocks = {
-            characters: [],
-            locations: [],
-            props: []
+    // Initialize concept_art_list if missing
+    if (!merged.concept_art_list) {
+        merged.concept_art_list = {
+            characters: {},
+            locations: {},
+            props: {}
         };
     }
-    if (!merged.visual_blocks.characters) merged.visual_blocks.characters = [];
-    if (!merged.visual_blocks.locations) merged.visual_blocks.locations = [];
-    if (!merged.visual_blocks.props) merged.visual_blocks.props = [];
+    if (!merged.concept_art_list.characters) merged.concept_art_list.characters = {};
+    if (!merged.concept_art_list.locations) merged.concept_art_list.locations = {};
+    if (!merged.concept_art_list.props) merged.concept_art_list.props = {};
 
-    // Helper sets for deduplication
-    const charIds = new Set<string>(merged.visual_blocks.characters.map((c: Character) => c.id));
-    const locIds = new Set<string>(merged.visual_blocks.locations.map((l: Location) => l.id));
-    const propIds = new Set<string>(merged.visual_blocks.props.map((p: Prop) => p.id));
-
-    // 3. Merge Loop
+    // 3. Merge Loop — merge concept_art_list and scenario scenes from other files
     for (const file of files) {
-        if (file === mainFile) continue; // Skip the main file as it's already base
+        if (file === mainFile) continue;
 
-        const vb = file.parsed.visual_blocks;
-        if (!vb) continue;
+        const cal = file.parsed.concept_art_list;
+        if (cal) {
+            // Merge characters
+            if (cal.characters) {
+                Object.entries(cal.characters).forEach(([key, value]) => {
+                    if (merged.concept_art_list.characters[key]) {
+                        result.warnings.push(`[${file.name}] 캐릭터 키 중복 무시됨: ${key}`);
+                    } else {
+                        merged.concept_art_list.characters[key] = value;
+                    }
+                });
+            }
 
-        // Merge Characters
-        if (vb.characters) {
-            vb.characters.forEach((char: Character) => {
-                if (charIds.has(char.id)) {
-                    result.warnings.push(`[${file.name}] 캐릭터 ID 중복 무시됨: ${char.id} (${char.name})`);
+            // Merge locations
+            if (cal.locations) {
+                Object.entries(cal.locations).forEach(([key, value]) => {
+                    if (merged.concept_art_list.locations[key]) {
+                        result.warnings.push(`[${file.name}] 장소 키 중복 무시됨: ${key}`);
+                    } else {
+                        merged.concept_art_list.locations[key] = value;
+                    }
+                });
+            }
+
+            // Merge props
+            if (cal.props) {
+                Object.entries(cal.props).forEach(([key, value]) => {
+                    if (merged.concept_art_list.props[key]) {
+                        result.warnings.push(`[${file.name}] 소품 키 중복 무시됨: ${key}`);
+                    } else {
+                        merged.concept_art_list.props[key] = value;
+                    }
+                });
+            }
+        }
+
+        // Merge scenario scenes (append non-duplicate scenes)
+        if (file.parsed.scenario?.scenes) {
+            const existingIds = new Set(merged.scenario?.scenes?.map(s => s.scene_id) || []);
+            file.parsed.scenario.scenes.forEach(scene => {
+                if (existingIds.has(scene.scene_id)) {
+                    result.warnings.push(`[${file.name}] 씬 ID 중복 무시됨: ${scene.scene_id}`);
                 } else {
-                    merged.visual_blocks!.characters!.push(char);
-                    charIds.add(char.id);
+                    if (!merged.scenario) {
+                        merged.scenario = { scenario_title: '', scenes: [] };
+                    }
+                    merged.scenario.scenes.push(scene);
+                    existingIds.add(scene.scene_id);
                 }
             });
         }
-
-        // Merge Locations
-        if (vb.locations) {
-            vb.locations.forEach((loc: Location) => {
-                if (locIds.has(loc.id)) {
-                    result.warnings.push(`[${file.name}] 장소 ID 중복 무시됨: ${loc.id} (${loc.name})`);
-                } else {
-                    merged.visual_blocks!.locations!.push(loc);
-                    locIds.add(loc.id);
-                }
-            });
-        }
-
-        // Merge Props
-        if (vb.props) {
-            vb.props.forEach((prop: Prop) => {
-                if (propIds.has(prop.id)) {
-                    result.warnings.push(`[${file.name}] 소품 ID 중복 무시됨: ${prop.id} (${prop.name})`);
-                } else {
-                    merged.visual_blocks!.props!.push(prop);
-                    propIds.add(prop.id);
-                }
-            });
-        }
-    }
-
-    // 4. Upgrade Step
-    // If we have any visual blocks, we can consider upgrading the step
-    const hasVisuals =
-        (merged.visual_blocks.characters && merged.visual_blocks.characters.length > 0) ||
-        (merged.visual_blocks.locations && merged.visual_blocks.locations.length > 0) ||
-        (merged.visual_blocks.props && merged.visual_blocks.props.length > 0);
-
-    if (hasVisuals) {
-        merged.current_step = 'concept_art_blocks_completed';
     }
 
     result.success = true;

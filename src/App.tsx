@@ -4,14 +4,10 @@ import { Sidebar } from './components/Layout/Sidebar';
 import { JsonInput } from './components/JsonInput/JsonInput';
 import { JsonEditor } from './components/JsonInput/JsonEditor';
 import { MetadataView } from './components/Viewer/MetadataView';
-import { SynopsisView } from './components/Viewer/SynopsisView';
-import { TreatmentView } from './components/Viewer/TreatmentView';
 import { ScenarioView } from './components/Viewer/ScenarioView';
-import { CharactersView } from './components/Viewer/CharactersView';
-import { LocationsView } from './components/Viewer/LocationsView';
-import { PropsView } from './components/Viewer/PropsView';
+import { ConceptArtListView } from './components/Viewer/ConceptArtListView';
 import { ValidationPanel } from './components/Validation/ValidationPanel';
-import { Stage1JSON, AppView, ValidationResult, CurrentStep } from './types/stage1.types';
+import { Stage1JSON, AppView, ValidationResult } from './types/stage1.types';
 import { parseJson, formatJson } from './utils/jsonParser';
 import { mergeJsonFiles, ParsedFile } from './utils/jsonMerger';
 import { AlertTriangle } from 'lucide-react';
@@ -41,24 +37,20 @@ function App() {
         setMergeWarnings(mergeResult.warnings);
         const newJson = mergeResult.mergedJson;
         setParsedJson(newJson);
-        setInitialJson(JSON.parse(JSON.stringify(newJson))); // Set initial state
-        setHistory([]); // Reset history
+        setInitialJson(JSON.parse(JSON.stringify(newJson)));
+        setHistory([]);
 
-        // Format the merged JSON back to string for editor/download
         const mergedJsonStr = formatJson(JSON.stringify(newJson));
         setJsonInput(mergedJsonStr);
 
-        // Validate the merged JSON
         const result = parseJson(mergedJsonStr);
 
-        // Apply Semantic Validation if basic parse is valid
         if (result.isValid && newJson) {
           const semanticErrors = validateStage1Json(newJson);
           result.errors.push(...semanticErrors);
         }
 
         setValidationResult(result);
-
         setCurrentView('metadata');
         setShowEditor(false);
 
@@ -68,35 +60,31 @@ function App() {
           }
         }
       } else {
-        // Merge failed
         alert(`병합 실패:\n${mergeResult.errors.join('\n')}`);
       }
 
     } else {
-      // Single string input (legacy/editor path)
+      // Single string input
       setJsonInput(input);
       setMergeWarnings([]);
 
-      // Parse and validate
       const result = parseJson(input);
 
       if (result.isValid) {
         try {
           const jsonToUse = result.fixedJson || input;
-          const parsed = JSON.parse(jsonToUse) as Stage1JSON; // Removed variable assignment that was causing duplication in my head, just using parsed
+          const parsed = JSON.parse(jsonToUse) as Stage1JSON;
 
-          // Apply Semantic Validation
           const semanticErrors = validateStage1Json(parsed);
           result.errors.push(...semanticErrors);
 
           setParsedJson(parsed);
-          setInitialJson(JSON.parse(JSON.stringify(parsed))); // Set initial state
-          setHistory([]); // Reset history
+          setInitialJson(JSON.parse(JSON.stringify(parsed)));
+          setHistory([]);
           setValidationResult(result);
           setCurrentView('metadata');
           setShowEditor(false);
 
-          // Update jsonInput with fixed version if auto-fixed
           if (result.fixedJson) {
             setJsonInput(formatJson(result.fixedJson));
           }
@@ -120,14 +108,12 @@ function App() {
   const handleSceneUpdate = useCallback((sceneId: string, newText: string) => {
     if (!parsedJson) return;
 
-    // Save to history
-    setHistory(prev => [...prev.slice(-19), JSON.parse(JSON.stringify(parsedJson))]); // Keep max 20
+    setHistory(prev => [...prev.slice(-19), JSON.parse(JSON.stringify(parsedJson))]);
 
-    // Update state
     const newJson = JSON.parse(JSON.stringify(parsedJson)) as Stage1JSON;
-    const scene = newJson.current_work.scenario.scenes.find(s => s.scene_id === sceneId);
+    const scene = newJson.scenario.scenes.find(s => s.scene_id === sceneId);
     if (scene) {
-      scene.scenario_text = newText;
+      scene.scene_scenario = newText;
       setParsedJson(newJson);
       setJsonInput(formatJson(JSON.stringify(newJson)));
     }
@@ -149,17 +135,15 @@ function App() {
   const handleRevertScene = useCallback((sceneId: string) => {
     if (!parsedJson || !initialJson) return;
 
-    const initialScene = initialJson.current_work.scenario.scenes.find(s => s.scene_id === sceneId);
+    const initialScene = initialJson.scenario.scenes.find(s => s.scene_id === sceneId);
     if (!initialScene) return;
 
-    // Save to history
     setHistory(prev => [...prev.slice(-19), JSON.parse(JSON.stringify(parsedJson))]);
 
-    // Update state
     const newJson = JSON.parse(JSON.stringify(parsedJson)) as Stage1JSON;
-    const scene = newJson.current_work.scenario.scenes.find(s => s.scene_id === sceneId);
+    const scene = newJson.scenario.scenes.find(s => s.scene_id === sceneId);
     if (scene) {
-      scene.scenario_text = initialScene.scenario_text;
+      scene.scene_scenario = initialScene.scene_scenario;
       setParsedJson(newJson);
       setJsonInput(formatJson(JSON.stringify(newJson)));
     }
@@ -200,7 +184,6 @@ function App() {
         };
         reader.readAsText(file);
       } else {
-        // Handle multiple files for merging
         const parsedFiles: ParsedFile[] = [];
         let filesProcessed = 0;
 
@@ -210,12 +193,9 @@ function App() {
             const content = event.target?.result as string;
             try {
               const parsedContent = JSON.parse(content) as Stage1JSON;
-              // infer type and filmId simply
               let type: 'main' | 'asset' | 'unknown' = 'unknown';
-              if (parsedContent.current_step === 'scenario_development' || (parsedContent.current_work as any)?.scenario) {
+              if (parsedContent.current_step === 'scenario_development' || parsedContent.scenario) {
                 type = 'main';
-              } else if (parsedContent.current_step === 'asset_addition' || Object.keys(parsedContent.visual_blocks || {}).length > 0) {
-                type = 'asset';
               }
 
               parsedFiles.push({
@@ -243,24 +223,20 @@ function App() {
         });
       }
     }
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   }, [handleJsonLoad]);
 
-  // Download logic uses current jsonInput which is synchronized with merged result
   const handleDownload = useCallback(() => {
     if (!parsedJson) return;
 
-    // Use jsonInput as the source of truth for download (it's the merged string)
     const jsonStr = formatJson(jsonInput);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // Update filename to indicate merged status if applicable, or keep original ID
-    a.download = `${parsedJson.film_id}_stage1_v1.1.json`;
+    a.download = `${parsedJson.film_id}_scenario_v6.0.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -306,45 +282,24 @@ function App() {
       switch (currentView) {
         case 'metadata':
           return <MetadataView data={parsedJson} />;
-        case 'synopsis':
-          return <SynopsisView data={parsedJson} />;
-        case 'treatment':
-          return parsedJson.current_work.treatment ? (
-            <TreatmentView data={parsedJson} />
+        case 'concept_art':
+          return parsedJson.concept_art_list ? (
+            <ConceptArtListView data={parsedJson} />
           ) : (
-            <NotAvailable section="Treatment" />
+            <NotAvailable section="Concept Art List" />
           );
         case 'scenario':
-          return parsedJson.current_work.scenario ? (
+          return parsedJson.scenario ? (
             <ScenarioView
               data={parsedJson}
               onSceneUpdate={handleSceneUpdate}
               onSceneRevert={handleRevertScene}
               onUndo={handleUndo}
               canUndo={history.length > 0}
-              initialScenario={initialJson?.current_work.scenario}
+              initialScenario={initialJson?.scenario}
             />
           ) : (
             <NotAvailable section="Scenario" />
-          );
-        case 'characters':
-          return parsedJson.visual_blocks?.characters ? (
-            <CharactersView data={parsedJson} />
-          ) : (
-            // Should not happen as navigation is disabled, but good fallback
-            <NotAvailable section="Characters" />
-          );
-        case 'locations':
-          return parsedJson.visual_blocks?.locations ? (
-            <LocationsView data={parsedJson} />
-          ) : (
-            <NotAvailable section="Locations" />
-          );
-        case 'props':
-          return parsedJson.visual_blocks?.props ? (
-            <PropsView data={parsedJson} />
-          ) : (
-            <NotAvailable section="Props" />
           );
         default:
           return <MetadataView data={parsedJson} />;
@@ -360,33 +315,25 @@ function App() {
   const handleAppend = useCallback((newFiles: ParsedFile[]) => {
     if (!parsedJson) return;
 
-    // 1. Convert current parsedJson to ParsedFile
-    // We treat the current project as the "Main" file for the merge context
     const currentFile: ParsedFile = {
       id: 'current-project',
       name: 'Current Project',
-      content: jsonInput, // Using jsonInput string to ensure consistency
+      content: jsonInput,
       parsed: parsedJson,
       type: 'main',
       filmId: parsedJson.film_id || 'UNKNOWN'
     };
 
-    // 2. Prepare file list for merger: [Current, ...New]
     const filesToMerge = [currentFile, ...newFiles];
-
-    // 3. Perform Merge
     const mergeResult = mergeJsonFiles(filesToMerge);
 
     if (mergeResult.success && mergeResult.mergedJson) {
-      // 4. Update State
       const newJson = mergeResult.mergedJson;
       setParsedJson(newJson);
 
-      // Update string representation
       const mergedJsonStr = formatJson(JSON.stringify(newJson));
       setJsonInput(mergedJsonStr);
 
-      // Validate
       const result = parseJson(mergedJsonStr);
       if (result.isValid && newJson) {
         const semanticErrors = validateStage1Json(newJson);
@@ -394,7 +341,6 @@ function App() {
       }
       setValidationResult(result);
 
-      // Show warnings if any
       if (mergeResult.warnings.length > 0) {
         setMergeWarnings(mergeResult.warnings);
         alert(`추가 완료 (경고 ${mergeResult.warnings.length}건)\n` + mergeResult.warnings.slice(0, 5).join('\n'));
@@ -419,7 +365,7 @@ function App() {
         accept=".json,application/json"
         onChange={handleFileSelect}
         className="hidden"
-        multiple // Allow multiple file selection
+        multiple
       />
 
       <JsonAppendModal
